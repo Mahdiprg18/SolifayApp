@@ -42,6 +42,7 @@ jobs:
         shell: bash
         run: |
           set -e
+
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-37.0"
 
@@ -49,9 +50,31 @@ jobs:
         shell: bash
         run: |
           set -e
-          sdkmanager "ndk;29.0.14206865"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
+
+          sdkmanager --channel=0 "ndk;29.0.14206865"
+
+          echo "===== Installed NDK directories ====="
+          find "$ANDROID_SDK_ROOT/ndk" -maxdepth 2 -type f -name source.properties -print 2>/dev/null || true
+
+          echo "===== Android SDK NDK directory ====="
+          ls -la "$ANDROID_SDK_ROOT/ndk" || true
+
+          echo "===== NDK package info ====="
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --list_installed \
+            | grep "ndk;" || true
+
+          NDK_DIR="$ANDROID_SDK_ROOT/ndk/29.0.14206865"
+
+          if [ ! -d "$NDK_DIR" ]; then
+            echo "ERROR: Expected NDK directory was not found."
+            echo "Searching for installed NDK directories..."
+            find "$ANDROID_SDK_ROOT" -maxdepth 4 -type d -name "29.0.14206865" -print
+            exit 1
+          fi
+
+          echo "NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK_DIR" >> "$GITHUB_ENV"
 
       - name: Verify Android SDK and NDK
         shell: bash
@@ -61,10 +84,18 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
 
-          test -d "$ANDROID_SDK_ROOT/platforms/android-37"
-          test -d "$ANDROID_SDK_ROOT/ndk/29.0.14206865"
+          echo "===== SDK platforms ====="
+          ls -la "$ANDROID_SDK_ROOT/platforms" || true
 
-          "$ANDROID_SDK_ROOT/ndk/29.0.14206865/ndk-build" --version
+          echo "===== NDK ====="
+          ls -la "$ANDROID_NDK_HOME" || true
+
+          if [ ! -f "$ANDROID_NDK_HOME/source.properties" ]; then
+            echo "ERROR: NDK source.properties not found."
+            exit 1
+          fi
+
+          cat "$ANDROID_NDK_HOME/source.properties"
 
       - name: Build libhevtun
         shell: bash
@@ -79,6 +110,7 @@ jobs:
           set -e
 
           mkdir -p "$GITHUB_WORKSPACE/V2rayNG/app/libs"
+
           cp -r "$GITHUB_WORKSPACE/libs/"* \
             "$GITHUB_WORKSPACE/V2rayNG/app/libs/"
 
@@ -89,6 +121,7 @@ jobs:
           set -e
 
           cd AndroidLibXrayLite
+
           CURRENT_TAG="$(git describe --tags --abbrev=0)"
 
           echo "AndroidLibXrayLite tag: $CURRENT_TAG"
@@ -107,7 +140,9 @@ jobs:
         run: |
           set -e
 
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$GITHUB_WORKSPACE/V2rayNG/local.properties"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" \
+            > "$GITHUB_WORKSPACE/V2rayNG/local.properties"
+
           chmod +x "$GITHUB_WORKSPACE/V2rayNG/gradlew"
 
       - name: Build Solifay Play Store Debug APK
@@ -121,7 +156,7 @@ jobs:
             --stacktrace \
             :app:assemblePlaystoreDebug
 
-      - name: List APK files
+      - name: List generated APKs
         shell: bash
         run: |
           set -e
