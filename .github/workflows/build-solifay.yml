@@ -17,9 +17,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ---------------------------------------------------------
-      # 1. Checkout the requested Solifay branch + submodules
-      # ---------------------------------------------------------
       - name: Checkout selected branch
         uses: actions/checkout@v7
         with:
@@ -27,9 +24,6 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # ---------------------------------------------------------
-      # 2. Java 21
-      # ---------------------------------------------------------
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
@@ -37,36 +31,24 @@ jobs:
           java-version: '21'
           cache: gradle
 
-      # ---------------------------------------------------------
-      # 3. Setup Android command-line tools only
-      #    Do NOT ask setup-android to install API 37 here.
-      # ---------------------------------------------------------
-      - name: Setup Android SDK tools
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
           log-accepted-android-sdk-licenses: false
           cmdline-tools-version: '14742923'
           packages: ''
 
-      # ---------------------------------------------------------
-      # 4. Install Android SDK Platform + Platform Tools
-      # ---------------------------------------------------------
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
 
-          sdkmanager --update
-
           yes | sdkmanager --licenses >/dev/null || true
 
           sdkmanager \
             "platform-tools" \
-            "platforms;android-37"
+            "platforms;android-37.0"
 
-      # ---------------------------------------------------------
-      # 5. Install NDK required by libhevtun
-      # ---------------------------------------------------------
       - name: Install NDK 29.0.14206865
         shell: bash
         run: |
@@ -78,29 +60,22 @@ jobs:
 
           echo "NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865" >> "$GITHUB_ENV"
 
-      # ---------------------------------------------------------
-      # 6. Build hev-socks5-tunnel native library
-      # ---------------------------------------------------------
       - name: Build libhevtun
         shell: bash
         run: |
           set -e
           bash compile-hevtun.sh
 
-      # ---------------------------------------------------------
-      # 7. Copy generated native libraries into Android project
-      # ---------------------------------------------------------
       - name: Copy libhevtun
         shell: bash
         run: |
           set -e
+
           mkdir -p "$GITHUB_WORKSPACE/V2rayNG/app/libs"
+
           cp -r "$GITHUB_WORKSPACE/libs/"* \
             "$GITHUB_WORKSPACE/V2rayNG/app/libs/"
 
-      # ---------------------------------------------------------
-      # 8. Find the AndroidLibXrayLite tag
-      # ---------------------------------------------------------
       - name: Get AndroidLibXrayLite tag
         id: xray_tag
         shell: bash
@@ -114,9 +89,6 @@ jobs:
           echo "AndroidLibXrayLite tag: $CURRENT_TAG"
           echo "CURRENT_TAG=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
 
-      # ---------------------------------------------------------
-      # 9. Download libv2ray.aar
-      # ---------------------------------------------------------
       - name: Download libv2ray
         uses: robinraju/release-downloader@v1.13
         with:
@@ -125,9 +97,6 @@ jobs:
           fileName: libv2ray.aar
           out-file-path: V2rayNG/app/libs/
 
-      # ---------------------------------------------------------
-      # 10. Prepare Android local.properties
-      # ---------------------------------------------------------
       - name: Prepare Android project
         shell: bash
         run: |
@@ -138,23 +107,15 @@ jobs:
 
           chmod +x "$GITHUB_WORKSPACE/V2rayNG/gradlew"
 
-      # ---------------------------------------------------------
-      # 11. Make sure Gradle can see the installed SDK
-      # ---------------------------------------------------------
-      - name: Verify Android SDK
+      - name: Verify SDK installation
         shell: bash
         run: |
           set -e
 
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "Installed SDK packages:"
+          sdkmanager --list_installed | grep -E \
+            "platform-tools|platforms;android-37|ndk;29.0.14206865" || true
 
-          sdkmanager --list | head -n 80
-
-      # ---------------------------------------------------------
-      # 12. Build Solifay Play Store Debug APK
-      # ---------------------------------------------------------
       - name: Build Play Store Debug APK
         working-directory: V2rayNG
         shell: bash
@@ -166,9 +127,6 @@ jobs:
             --stacktrace \
             :app:assemblePlaystoreDebug
 
-      # ---------------------------------------------------------
-      # 13. Show generated APKs
-      # ---------------------------------------------------------
       - name: List generated APKs
         shell: bash
         run: |
@@ -180,9 +138,6 @@ jobs:
             -name "*.apk" \
             -print
 
-      # ---------------------------------------------------------
-      # 14. Upload APK as GitHub Artifact
-      # ---------------------------------------------------------
       - name: Upload Solifay APK
         uses: actions/upload-artifact@v7
         with:
