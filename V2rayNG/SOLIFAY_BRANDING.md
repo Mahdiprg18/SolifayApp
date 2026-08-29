@@ -1,0 +1,1 @@
+Solifay initial UI customization: dark red liquid-glass inspired theme, Solifay launcher/toolbar logo, About Powered by Soling.
